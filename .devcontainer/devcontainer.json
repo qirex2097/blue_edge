@@ -1,0 +1,31 @@
+{
+	"name": "C Development",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "latest"
+		}
+	},
+	"containerEnv": {
+		"DISPLAY": "host.docker.internal:0.0"
+	},
+	"runArgs": [
+		"--net=host",
+		"--env", "LIBGL_ALWAYS_INDIRECT=1"
+	],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools"
+			]
+		}
+	},
+	"remoteUser": "vscode",
+	"mounts": [
+		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+	],
+	"postCreateCommand": "npm install -g @google/gemini-cli"
+}
