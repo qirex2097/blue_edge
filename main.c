@@ -8,7 +8,7 @@ int	main(void)
 	t_data      data;
 	int result;
 	
-	result = win_initialize(&data);
+	result = win_initialize(&data, 800, 600);
 	if (result != 0)
 		return result;
 	

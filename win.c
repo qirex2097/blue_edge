@@ -1,16 +1,35 @@
 #include <mlx.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include "win.h"
 
-int win_initialize(t_data *data)
+void debug_print(t_data *data, const char *line, ...)
+{
+	static int y = 10;
+	char buffer[256];
+	
+	// 表示する文字列を作成
+	va_list ap;
+	va_start(ap, line);
+	vsnprintf(buffer, sizeof(buffer), line, ap);
+	va_end(ap);
+
+	// 文字列をウィンドウに描画
+	mlx_string_put(data->mlx, data->win, 20, y, 0xFFFFFF, buffer); // 白色で表示
+
+	y += 10;
+}
+
+int win_initialize(t_data *data, int width, int height)
 {
 	// minilibxの初期化
 	data->mlx = mlx_init();
 	if (!data->mlx)
 		return (1);
-	// 幅800, 高さ600のウィンドウを作成
-	data->win = mlx_new_window(data->mlx, 800, 600, "10-second Window");
+
+	// 幅 width, 高さ height のウィンドウを作成
+	data->win = mlx_new_window(data->mlx, width, height, "10-second Window");
 	if (!data->win)
 		return (1);
 	    
@@ -20,15 +39,12 @@ int win_initialize(t_data *data)
 int render_next_frame(void* arg)
 {
 	t_data *data = (t_data*)arg;
-	char buffer[256];
 
 	if (data->counter != data->prev_counter) {
 		// 画面をクリア
 		mlx_clear_window(data->mlx, data->win);
-		// 表示する文字列を作成
-		sprintf(buffer, "Counter: %ld", data->counter);
-		// 文字列をウィンドウに描画
-		mlx_string_put(data->mlx, data->win, 10, 20, 0xFFFFFF, buffer); // 白色で表示
+
+		debug_print(data, "Counter: %ld", data->counter);
 		printf("render_next_frame: %ld\n", data->counter);
 		data->prev_counter = data->counter;
 	}

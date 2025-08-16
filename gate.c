@@ -5,7 +5,7 @@
 #include "gate.h"
 
 // スレッドで実行されるカウンター関数
-void    *counter_thread(void *arg)
+void *counter_thread(void *arg)
 {
 	t_data  *data = (t_data *)arg;
 
