@@ -3,7 +3,7 @@ SRC = main.c
 CC = gcc
 MLX_DIR = ./minilibx-linux
 CFLAGS = -Wall -Wextra -Werror -I$(MLX_DIR)
-LDFLAGS = -L$(MLX_DIR) -lmlx -lXext -lX11 -lm
+LDFLAGS = -L$(MLX_DIR) -lmlx -lXext -lX11 -lm -lpthread
 
 all: $(NAME)
 
