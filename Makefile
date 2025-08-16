@@ -1,5 +1,5 @@
 NAME = app
-SRC = main.c
+SRC = main.c gate.c win.c
 CC = gcc
 MLX_DIR = ./minilibx-linux
 CFLAGS = -Wall -Wextra -Werror -I$(MLX_DIR)
