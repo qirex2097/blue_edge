@@ -11,7 +11,7 @@ void *counter_thread(void *arg)
 
 	data->counter = 0;
 	while (1) {
-		printf("Counter: %ld\n", data->counter);
+		// printf("Counter: %ld\n", data->counter);
 		sleep(1); // 1秒待機
 		data->counter++;
 	}
@@ -26,7 +26,7 @@ int gate_initialize(t_data *data)
 	if (pthread_create(&thread_id, NULL, counter_thread, data) != 0)
 	{
 		perror("pthread_create");
-		return (1);
+		return (-1);
 	}
 	// スレッドをデタッチし、リソースが自動的に解放されるようにする
 	pthread_detach(thread_id);

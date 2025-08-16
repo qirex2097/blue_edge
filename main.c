@@ -5,7 +5,7 @@
 
 int	main(void)
 {
-	t_data      data;
+	t_data      data = (t_data){0};
 	int result;
 	
 	result = win_initialize(&data, 800, 600);
