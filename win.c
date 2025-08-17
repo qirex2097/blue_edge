@@ -80,13 +80,13 @@ int render_next_frame(void* arg)
 	debug_reset_lines();
 
 	pthread_mutex_lock(&data->mutex);
-	int counter = data->counter;
-	unsigned char *image_adrs = data->image_adrs;
+	int counter = data->mnist.counter;
+	unsigned char *image_adrs = data->mnist.image_adrs;
 	pthread_mutex_unlock(&data->mutex);
 	if (image_adrs) {
 		for (int i = 0; i < 28; i++) {
 			for (int j = 0; j < 28; j++) {
-				unsigned char pixel = image_adrs[counter * data->cols * data->rows + i * data->rows + j];
+				unsigned char pixel = image_adrs[counter * data->mnist.cols * data->mnist.rows + i * data->mnist.rows + j];
 				my_img_pixel_put(&data->img, j + 100, i + 100, (int)pixel);
 			}
 		}

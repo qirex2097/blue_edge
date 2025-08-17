@@ -33,18 +33,18 @@ static void *counter_thread(void *arg)
 	printf("labels: count=%ld\n", s_labels.count);
 	
 	pthread_mutex_lock(&data->mutex);
-	data->image_adrs = s_images.adrs;
-	data->cols = s_images.cols;
-	data->rows = s_images.rows;
-	data->counter = 0;
+	data->mnist.image_adrs = s_images.adrs;
+	data->mnist.cols = s_images.cols;
+	data->mnist.rows = s_images.rows;
+	data->mnist.counter = 0;
 	pthread_mutex_unlock(&data->mutex);
 	while (1) {
-		printf("Counter: %ld\n", data->counter);
+		printf("Counter: %ld\n", data->mnist.counter);
 		sleep(1); // 1秒待機
 		pthread_mutex_lock(&data->mutex);
-		data->counter++;
-		if (data->counter >= s_images.count)
-			data->counter = 0;
+		data->mnist.counter++;
+		if (data->mnist.counter >= s_images.count)
+			data->mnist.counter = 0;
 		pthread_mutex_unlock(&data->mutex);
 	}
 	return (NULL);
