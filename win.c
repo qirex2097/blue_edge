@@ -25,12 +25,14 @@ void debug_print(t_data *data, const char *line, ...)
 
 void my_img_clear(t_img *img)
 {
+	assert(img);
+	assert(img->adrs);
 	memset(img->adrs, 0, img->w * img->h * (img->bits_per_pixel / 8));
 }
 
 void my_img_pixel_put(t_img *img, int x, int y, int color)
 {
-	if (x < 0 || img->w <= x || y < 0 || img->h <= y) return;
+	if (!img || !img->adrs || x < 0 || img->w <= x || y < 0 || img->h <= y) return;
 	char *dst = img->adrs + (y * img->line_length + x * (img->bits_per_pixel / 8));
 	*(unsigned int *)dst = color;
 }
@@ -81,13 +83,16 @@ int render_next_frame(void* arg)
 
 	pthread_mutex_lock(&data->mutex);
 	int counter = data->mnist.counter;
-	unsigned char *image_adrs = data->mnist.image_adrs;
+	unsigned char *image_adrs = &data->mnist.image_adrs[counter * data->mnist.cols * data->mnist.rows];
 	pthread_mutex_unlock(&data->mutex);
 	if (image_adrs) {
-		for (int i = 0; i < 28; i++) {
-			for (int j = 0; j < 28; j++) {
-				unsigned char pixel = image_adrs[counter * data->mnist.cols * data->mnist.rows + i * data->mnist.rows + j];
-				my_img_pixel_put(&data->img, j + 100, i + 100, (int)pixel);
+		int rows = data->mnist.rows;
+		int cols = data->mnist.cols;
+		for (int i = 0; i < rows; i++) {
+			for (int j = 0; j < cols; j++) {
+				unsigned char pixel = image_adrs[i * rows + j];
+				int gray = (int)pixel * 0x010101;
+				my_img_pixel_put(&data->img, j + 100, i + 100, gray);
 			}
 		}
 	}

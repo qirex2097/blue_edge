@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "mnist.h"
 
 #define MNIST_IMAGE_ROWS 28
@@ -31,8 +32,15 @@ t_mnist_data mnist_read_images(const char* filename) {
     }
 
     t_mnist_data data = { .adrs = NULL, .count = num, .cols = cols, .rows = rows, };
-    data.adrs = malloc(num * rows * cols);
-    fread(data.adrs, 1, num * rows * cols, fp);
+    size_t total = (size_t)num * (size_t)rows * (size_t)cols;
+    data.adrs = malloc(total);
+    if (!data.adrs) {
+        perror("malloc");
+        fclose(fp);
+        return (t_mnist_data){0};
+    }
+    size_t nread = fread(data.adrs, 1, num * rows * cols, fp);
+    assert(nread == total);
     fclose(fp);
     return data;
 }
@@ -84,7 +92,7 @@ int main(void)
     labels_data = mnist_read_labels("data/train-labels-idx1-ubyte");
 
     if (images_data.adrs && labels_data.adrs) {
-        printf("Loaded %d images, %d labels\n", images_data.count, labels_data.count);
+        printf("Loaded %zu images, %zu labels\n", images_data.count, labels_data.count);
         // 例: 1枚目の画像を表示
         mnist_print_image(images_data.adrs, labels_data.adrs, 0);
     }

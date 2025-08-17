@@ -1,5 +1,6 @@
 #ifndef _MNIST_H_
 #define _MNIST_H_
+#include <stddef.h>
 
 typedef struct {
     unsigned char* adrs;

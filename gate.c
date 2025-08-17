@@ -39,8 +39,12 @@ static void *counter_thread(void *arg)
 	data->mnist.counter = 0;
 	pthread_mutex_unlock(&data->mutex);
 	while (1) {
-		printf("Counter: %ld\n", data->mnist.counter);
+		pthread_mutex_lock(&data->mutex);
+		size_t cur = data->mnist.counter;
+		pthread_mutex_unlock(&data->mutex);
+		printf("Counter: %ld\n", cur);
 		sleep(1); // 1秒待機
+
 		pthread_mutex_lock(&data->mutex);
 		data->mnist.counter++;
 		if (data->mnist.counter >= s_images.count)
