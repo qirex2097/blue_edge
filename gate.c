@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <string.h>
 #include "main.h"
 #include "gate.h"
 #include "mnist.h"
@@ -31,10 +32,12 @@ static void *counter_thread(void *arg)
 	printf("images: count=%ld,rows=%d,cols=%d\n", s_images.count, s_images.rows, s_images.cols);
 	printf("labels: count=%ld\n", s_labels.count);
 	
+	data->image_adrs = s_images.adrs;
+	data->cols = s_images.cols;
+	data->rows = s_images.rows;
 	data->counter = 0;
 	while (1) {
-		data->image_adrs = &s_images.adrs[data->counter * s_images.rows * s_images.cols];
-		// printf("Counter: %ld\n", data->counter);
+		printf("Counter: %ld\n", data->counter);
 		sleep(1); // 1秒待機
 		data->counter++;
 		if (data->counter >= s_images.count)

@@ -50,7 +50,16 @@ int render_next_frame(void* arg)
 	mlx_clear_window(data->mlx, data->win);
 	debug_reset_lines();
 
-	debug_print(data, "adrs: 0x%x", data->image_adrs);
+	mlx_pixel_put(data->mlx, data->win, 100, 100, 0x00ffffff);
+	if (data->image_adrs) {
+		for (int i = 0; i < 28; i++) {
+			for (int j = 0; j < 28; j++) {
+				unsigned char pixel = data->image_adrs[data->counter * data->cols * data->rows + i * data->rows + j];
+				// if (pixel > 128) mlx_pixel_put(data->mlx, data->win, j + 100, i + 100, 0x00ffffff);
+				mlx_pixel_put(data->mlx, data->win, j + 100, i + 100, pixel);
+			}
+		}
+	}
 
 	return 0;
 }
