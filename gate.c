@@ -32,16 +32,20 @@ static void *counter_thread(void *arg)
 	printf("images: count=%ld,rows=%d,cols=%d\n", s_images.count, s_images.rows, s_images.cols);
 	printf("labels: count=%ld\n", s_labels.count);
 	
+	pthread_mutex_lock(&data->mutex);
 	data->image_adrs = s_images.adrs;
 	data->cols = s_images.cols;
 	data->rows = s_images.rows;
 	data->counter = 0;
+	pthread_mutex_unlock(&data->mutex);
 	while (1) {
 		printf("Counter: %ld\n", data->counter);
 		sleep(1); // 1秒待機
+		pthread_mutex_lock(&data->mutex);
 		data->counter++;
 		if (data->counter >= s_images.count)
 			data->counter = 0;
+		pthread_mutex_unlock(&data->mutex);
 	}
 	return (NULL);
 }
@@ -50,10 +54,16 @@ int gate_initialize(t_data *data)
 {
 	pthread_t   thread_id;
 
+	if (pthread_mutex_init(&data->mutex, NULL) != 0)
+	{
+		perror("pthread_mutex_init");
+		return (-1);
+	}
 	// カウンタースレッドを作成し、data構造体を渡す
 	if (pthread_create(&thread_id, NULL, counter_thread, data) != 0)
 	{
 		perror("pthread_create");
+		pthread_mutex_destroy(&data->mutex);
 		return (-1);
 	}
 	// スレッドをデタッチし、リソースが自動的に解放されるようにする
