@@ -119,6 +119,7 @@ void win_loop(t_data *data)
 	// mlx_loop_endが呼ばれると、このループは終了する
 	mlx_loop(data->mlx_ptr);
 	// --- クリーンアップ処理 ---
+	mlx_destroy_image(data->mlx_ptr, data->img.img_ptr);
 	mlx_destroy_window(data->mlx_ptr, data->win_ptr);
 	mlx_destroy_display(data->mlx_ptr);
 }
