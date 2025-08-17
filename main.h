@@ -1,5 +1,6 @@
 #ifndef MAIN_H_
 #define MAIN_H_
+#include <assert.h>
 #include <stdlib.h>
 // mlxポインタをスレッドに渡すための構造体
 typedef struct s_data

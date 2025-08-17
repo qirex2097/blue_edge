@@ -1,3 +1,6 @@
 .env
 minilibx-linux
+data
+a.out
 app
+*.o
