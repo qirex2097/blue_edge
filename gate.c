@@ -8,26 +8,37 @@
 static t_mnist_data s_images = (t_mnist_data){0};
 static t_mnist_data s_labels = (t_mnist_data){0};
 
-// スレッドで実行されるカウンター関数
-void *counter_thread(void *arg)
+static void read_images_and_labels()
 {
 	const char images_filename[] = "data/train-images-idx3-ubyte";
 	const char labels_filename[] = "data/train-labels-idx1-ubyte";
-	t_data  *data = (t_data *)arg;
-	
+
 	s_images = mnist_read_images(images_filename);
  	assert(s_images.adrs != NULL);
+	printf("%s readed.\n", images_filename);
+
     s_labels = mnist_read_labels(labels_filename);
 	assert(s_labels.adrs != NULL);
-
-	printf("%s readed.\n", images_filename);
 	printf("%s readed.\n", labels_filename);
+}
 
+// スレッドで実行されるカウンター関数
+static void *counter_thread(void *arg)
+{
+	t_data  *data = (t_data *)arg;
+
+	read_images_and_labels();
+	printf("images: count=%ld,rows=%d,cols=%d\n", s_images.count, s_images.rows, s_images.cols);
+	printf("labels: count=%ld\n", s_labels.count);
+	
 	data->counter = 0;
 	while (1) {
+		data->image_adrs = &s_images.adrs[data->counter * s_images.rows * s_images.cols];
 		// printf("Counter: %ld\n", data->counter);
 		sleep(1); // 1秒待機
 		data->counter++;
+		if (data->counter >= s_images.count)
+			data->counter = 0;
 	}
 	return (NULL);
 }

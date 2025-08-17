@@ -8,7 +8,7 @@ typedef struct s_data
 	void	*mlx;
 	void	*win;
 	size_t	counter;
-	size_t  prev_counter;
+	unsigned char *image_adrs;
 }           t_data;
 
 #endif//MAIN_H_

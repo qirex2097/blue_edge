@@ -3,7 +3,7 @@
 
 typedef struct {
     unsigned char* adrs;
-    int count;
+    size_t count;
     int rows;
     int cols;
 } t_mnist_data;

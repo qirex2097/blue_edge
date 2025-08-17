@@ -46,14 +46,12 @@ int render_next_frame(void* arg)
 {
 	t_data *data = (t_data*)arg;
 
-	if (data->counter != data->prev_counter) {
-		// 画面をクリア
-		mlx_clear_window(data->mlx, data->win);
-		debug_reset_lines();
+	// 画面をクリア
+	mlx_clear_window(data->mlx, data->win);
+	debug_reset_lines();
 
-		debug_print(data, "Counter: %ld", data->counter);
-		data->prev_counter = data->counter;
-	}
+	debug_print(data, "adrs: 0x%x", data->image_adrs);
+
 	return 0;
 }
 
