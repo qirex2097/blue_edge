@@ -1,5 +1,5 @@
 NAME = app
-SRCS = main.c gate.c win.c mnist.c
+SRCS = main.c gate.c win.c mnist.c mat.c
 OBJS = $(SRCS:.c=.o)
 CC = gcc
 MLX_DIR = ./minilibx-linux
@@ -19,7 +19,7 @@ mnist: mnist.c
 	$(CC) mnist.c -D MNIST_STANDALONE -o $@
 
 mat: mat.c mnist.c
-	$(CC) mat.c mnist.c -lm -o $@
+	$(CC) mat.c mnist.c -D MAT_STANDALONE -lm -o $@
 
 clean:
 	rm -f $(OBJS) $(TARGET)
