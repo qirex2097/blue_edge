@@ -5,6 +5,8 @@
 #include "main.h"
 #include "gate.h"
 #include "mnist.h"
+#include "mat.h"
+#include "nn.h"
 
 static t_mnist_data s_images = (t_mnist_data){0};
 static t_mnist_data s_labels = (t_mnist_data){0};
@@ -54,6 +56,8 @@ static void *counter_thread(void *arg)
 	return (NULL);
 }
 
+static void mnist_thread(void *arg);
+
 int gate_initialize(t_data *data)
 {
 	pthread_t   thread_id;
@@ -72,6 +76,63 @@ int gate_initialize(t_data *data)
 	}
 	// スレッドをデタッチし、リソースが自動的に解放されるようにする
 	pthread_detach(thread_id);
+	
+	(void)mnist_thread;
 
 	return 0;
+}
+
+static void mnist_thread(void *arg)
+{
+	t_data *data = (t_data *)arg;
+	(void)data;
+
+    srand(time(0));
+    // MNIST読み込み
+    Mat train_x = read_images("data/train-images-idx3-ubyte");
+    Mat train_t = read_labels("data/train-labels-idx1-ubyte");
+
+    size_t input_size = 784;
+    size_t hidden1_size = 128;
+    size_t hidden2_size = 64;
+    size_t output_size = 10;
+    size_t batch_size = 100;
+    size_t epochs = 10;
+    float learning_rate = 0.001f;
+
+    // パラメータ初期化
+    NN nn = NN_init(input_size, hidden1_size, hidden2_size, output_size, batch_size);
+
+    for (size_t epoch = 0; epoch < epochs; epoch++)
+    {
+        for (size_t i = 0; i < train_x.rows; i += batch_size)
+        {
+            // ミニバッチ作成
+            Mat x_batch = mat_slice_view(train_x, i, batch_size);
+            Mat t_batch = mat_slice_view(train_t, i, batch_size);
+
+            // --- forward ---
+            Mat y = NN_forward(&nn, x_batch);
+            mat_elem_t loss = cross_entropy(y, t_batch);
+
+            // --- backward ---
+            NN_backward(&nn, y, t_batch);
+            // --- 更新 ---
+            NN_update(&nn, learning_rate);
+
+            if (i % 1000 == 0)
+            {
+                float batch_accuracy = calculate_accuracy(y, t_batch);
+                printf("epoch %zu, iter %zu, loss = %f, batch_acc = %f\n", epoch, i, loss, batch_accuracy);
+            }
+
+            // メモリ解放
+            mat_free(&y);
+            // x_batch and t_batch are views, do not free them.
+        }
+    }
+
+    NN_free(&nn);
+    mat_free(&train_x);
+    mat_free(&train_t);
 }

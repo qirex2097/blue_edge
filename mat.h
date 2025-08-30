@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 
 typedef float mat_elem_t;
@@ -21,6 +22,7 @@ typedef struct
 Mat mat_alloc(size_t rows, size_t cols);
 void mat_free(Mat *m);
 void mat_zero(Mat m);
+void mat_copy(Mat dst, Mat src);
 void mat_rand(Mat m, mat_elem_t low, mat_elem_t high);
 void mat_add_inplace(Mat dst, Mat other);
 void mat_add_rowwise_inplace(Mat dst, Mat rowvec);
@@ -30,6 +32,7 @@ void mat_transpose(Mat dst, Mat src);
 Mat mat_transpose_alloc(Mat dst);
 void mat_sum_cols(Mat dst, Mat src);
 Mat mat_sum_cols_alloc(Mat src);
+Mat mat_slice_view(Mat src, size_t start, size_t num);
 void mat_print(Mat m, const char *name, size_t padding);
 
 #ifdef MAT_IMPLEMENTATION
@@ -60,13 +63,14 @@ void mat_free(Mat *m)
 
 void mat_zero(Mat m)
 {
-    for (size_t row = 0; row < m.rows; row++)
-    {
-        for (size_t col = 0; col < m.cols; col++)
-        {
-            MAT_AT(m, row, col) = 0;
-        }
-    }
+    memset(m.data, 0, sizeof(mat_elem_t) * m.rows * m.cols);
+}
+
+void mat_copy(Mat dst, Mat src)
+{
+    assert(dst.rows == src.rows);
+    assert(dst.cols == src.cols);
+    memcpy(dst.data, src.data, sizeof(mat_elem_t) * dst.rows * dst.cols);
 }
 
 void mat_rand(Mat m, mat_elem_t low, mat_elem_t high)
@@ -174,6 +178,14 @@ Mat mat_sum_cols_alloc(Mat src)
     mat_sum_cols(dst, src);
     return dst;
 }
+
+Mat mat_slice_view(Mat src, size_t start, size_t num)
+{
+    if (start + num >= src.rows)
+        num = src.rows - start;
+    return (Mat){.rows = num, .cols = src.cols, .data = &src.data[start * src.cols]};
+}
+
 
 void mat_print(Mat m, const char *name, size_t padding)
 {
