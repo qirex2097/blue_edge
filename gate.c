@@ -6,7 +6,7 @@
 #include "gate.h"
 #include "mnist.h"
 #include "mat.h"
-#include "nn.h"
+// #include "nn.h"
 
 typedef struct {
 	const char *name;
@@ -75,6 +75,7 @@ static void *counter_thread(void *arg)
 		data->mnist.image_adrs[i] = (unsigned char)(dataset.ti.es[data->mnist.counter * 28 * 28 + i] * 256);
 	}
 	pthread_mutex_unlock(&data->mutex);
+
 	while (1) {
 		pthread_mutex_lock(&data->mutex);
 		size_t cur = data->mnist.counter;

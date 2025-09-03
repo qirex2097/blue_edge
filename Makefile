@@ -1,11 +1,11 @@
 NAME = app
-SRCS = main.c gate.c win.c mnist.c mat.c nn.c
+SRCS = main.c gate.c win.c mnist.c mat.c
 OBJS = $(SRCS:.c=.o)
 CC = gcc
 MLX_DIR = ./minilibx-linux
 CFLAGS = -Wall -Wextra -Werror -I$(MLX_DIR)
 LDFLAGS = -L$(MLX_DIR) -lmlx -lXext -lX11 -lm -lpthread
-TARGET = $(NAME) mnist mat
+TARGET = $(NAME) mnist
 
 all: $(TARGET)
 
@@ -17,9 +17,6 @@ $(NAME): $(OBJS)
 
 mnist: mnist.c
 	$(CC) mnist.c -D MNIST_STANDALONE -o $@
-
-mat: mat.c mnist.c
-	$(CC) mat.c mnist.c -D MAT_STANDALONE -lm -o $@
 
 clean:
 	rm -f $(OBJS) $(TARGET)
