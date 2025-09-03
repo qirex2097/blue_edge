@@ -6,11 +6,11 @@ void test_mat_alloc()
     Mat m = mat_alloc(2, 3);
     assert(m.rows == 2);
     assert(m.cols == 3);
-    assert(m.data);
-    mat_free(&m);
+    assert(m.es);
+    MAT_FREE(m);
     assert(m.rows == 0);
     assert(m.cols == 0);
-    assert(!m.data);
+    assert(!m.es);
     printf("mat_alloc test passed.\n");
 }
 
@@ -22,9 +22,9 @@ void test_mat_zero()
     mat_zero(m);
     for (size_t i = 0; i < m.rows * m.cols; i++)
     {
-        assert(m.data[i] == 0);
+        assert(m.es[i] == 0);
     }
-    mat_free(&m);
+    MAT_FREE(m);
     printf("mat_zero test passed.\n");
 }
 
@@ -35,9 +35,9 @@ void test_mat_rand()
     mat_rand(m, 5, 10);
     for (size_t i = 0; i < m.rows * m.cols; i++)
     {
-        assert(m.data[i] >= 5 && m.data[i] <= 10);
+        assert(m.es[i] >= 5 && m.es[i] <= 10);
     }
-    mat_free(&m);
+    MAT_FREE(m);
     printf("mat_rand test passed.\n");
 }
 
@@ -52,19 +52,19 @@ void test_mat_add_inplace()
     Mat c = mat_alloc(2, 2);
     for (size_t i = 0; i < a.rows * a.cols; i++)
     {
-        c.data[i] = a.data[i] + b.data[i];
+        c.es[i] = a.es[i] + b.es[i];
     }
 
     mat_add_inplace(a, b);
 
     for (size_t i = 0; i < a.rows * a.cols; i++)
     {
-        assert(a.data[i] == c.data[i]);
+        assert(a.es[i] == c.es[i]);
     }
 
-    mat_free(&a);
-    mat_free(&b);
-    mat_free(&c);
+    MAT_FREE(a);
+    MAT_FREE(b);
+    MAT_FREE(c);
     printf("mat_add_inplace test passed.\n");
 }
 
@@ -76,7 +76,7 @@ void test_mat_dot()
     Mat b = mat_alloc(3, 2);
     mat_rand(b, 0, 1);
     Mat c = mat_alloc(2, 2);
-    mat_dot(c, a, b);
+    mat_dot_inline(c, a, b);
 
     for (size_t i = 0; i < a.rows; i++)
     {
@@ -91,9 +91,9 @@ void test_mat_dot()
         }
     }
 
-    mat_free(&a);
-    mat_free(&b);
-    mat_free(&c);
+    MAT_FREE(a);
+    MAT_FREE(b);
+    MAT_FREE(c);
     printf("mat_dot test passed.\n");
 }
 
@@ -102,8 +102,7 @@ void test_mat_transpose()
     printf("Testing mat_transpose...\n");
     Mat a = mat_alloc(2, 3);
     mat_rand(a, 0, 1);
-    Mat b = mat_alloc(3, 2);
-    mat_transpose(b, a);
+    Mat b = mat_transpose(a);
 
     for (size_t i = 0; i < a.rows; i++)
     {
@@ -113,7 +112,7 @@ void test_mat_transpose()
         }
     }
 
-    mat_free(&a);
-    mat_free(&b);
+    MAT_FREE(a);
+    MAT_FREE(b);
     printf("mat_transpose test passed.\n");
 }

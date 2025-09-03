@@ -125,7 +125,7 @@ static void *counter_thread(void *arg)
 {
 	t_data  *data = (t_data *)arg;
 
-	Dataset dataset = dataset_mnist_load(train_images_path, train_labels_path, "minst_train");
+	Dataset dataset = dataset_mnist_load(train_images_path, train_labels_path, "mnist_train");
 	Dataset ds_test = dataset_mnist_load(t10k_images_path, t10k_labels_path, "mnist_test");
 	printf("images: count=%ld,%ld\n", dataset.ti.rows, ds_test.ti.rows);
 	printf("labels: count=%ld,%ld\n", dataset.to.rows, ds_test.to.rows);
@@ -133,7 +133,7 @@ static void *counter_thread(void *arg)
 	pthread_mutex_lock(&data->mutex);
 	data->mnist.counter = 0;
 	for (size_t i = 0; i < 28 * 28; i++) {
-		data->mnist.image_adrs[i] = (unsigned char)(dataset.ti.es[data->mnist.counter * 28 * 28 + i] * 256);
+		data->mnist.image_adrs[i] = (unsigned char)(dataset.ti.es[data->mnist.counter * 28 * 28 + i] * 255);
 	}
 	pthread_mutex_unlock(&data->mutex);
 	

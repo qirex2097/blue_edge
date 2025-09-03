@@ -1,12 +1,16 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <assert.h>
+#include "mnist.h"
 
 #define MNIST_IMAGE_ROWS 28
 #define MNIST_IMAGE_COLS 28
 
 // 画像データを読み込む
 unsigned char* mnist_read_images(const char* filename, int* count) {
+    assert(count);
+    assert(filename);
     FILE* fp = fopen(filename, "rb");
     if (!fp) {
         perror("fopen");
@@ -24,19 +28,39 @@ unsigned char* mnist_read_images(const char* filename, int* count) {
     cols  = __builtin_bswap32(cols);
 
     if (magic != 2051) {
-        printf("Not MNIST image file\n");
+        fprintf(stderr, "Not MNIST image file\n");
+        fclose(fp);
+        return NULL;
+    }
+    if (rows != MNIST_IMAGE_ROWS || cols != MNIST_IMAGE_COLS) {
+        fprintf(stderr, "Unexpected image dims: %u x %u\n", rows, cols);
         fclose(fp);
         return NULL;
     }
     *count = num;
-    unsigned char* data = malloc(num * rows * cols);
-    fread(data, 1, num * rows * cols, fp);
+    size_t total = (size_t)num * rows * cols;
+    unsigned char* data = malloc(total);
+    if (!data) {
+        perror("malloc");
+        fclose(fp);
+        return NULL;
+    }
+    size_t read_size;
+    read_size = fread(data, 1, total, fp);
+    if (read_size != total) {
+        perror("short read on data\n");
+        free(data);
+        fclose(fp);
+        return NULL;
+    }
     fclose(fp);
     return data;
 }
 
 // ラベルデータを読み込む
 unsigned char* mnist_read_labels(const char* filename, int* count) {
+    assert(filename);
+    assert(count);
     FILE* fp = fopen(filename, "rb");
     if (!fp) {
         perror("fopen");
@@ -48,13 +72,25 @@ unsigned char* mnist_read_labels(const char* filename, int* count) {
     magic = __builtin_bswap32(magic);
     num   = __builtin_bswap32(num);
     if (magic != 2049) {
-        printf("Not MNIST label file\n");
+        fprintf(stderr, "Not MNIST label file\n");
         fclose(fp);
         return NULL;
     }
     *count = num;
     unsigned char* labels = malloc(num);
-    fread(labels, 1, num, fp);
+    if (!labels) {
+        perror("malloc");
+        fclose(fp);
+        return NULL;
+    }
+    size_t read_size;
+    read_size = fread(labels, 1, num, fp);
+    if (read_size != num) {
+        perror("short read on labels\n");
+        free(labels);
+        fclose(fp);
+        return NULL;
+    }
     fclose(fp);
     return labels;
 }
