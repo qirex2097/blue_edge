@@ -9,7 +9,8 @@
 #include "mat.h"
 #include "nn.h"
 
-typedef struct {
+typedef struct
+{
 	const char *name;
 	Mat ti;
 	Mat to;
@@ -27,7 +28,7 @@ Dataset dataset_mnist_load(const char *image_path, const char *label_path, const
 	int images_num, labels_num;
 	unsigned char *images = mnist_read_images(image_path, &images_num);
 	unsigned char *labels = mnist_read_labels(label_path, &labels_num);
-	
+
 	assert(images != NULL && labels != NULL);
 	assert(images_num == labels_num);
 
@@ -36,19 +37,22 @@ Dataset dataset_mnist_load(const char *image_path, const char *label_path, const
 
 	Mat ti, to;
 	ti = mat_alloc(images_num, input_cols);
-	for (size_t row = 0; row < ti.rows; row++) {
-		for (size_t col = 0; col < ti.cols; col++) {
+	for (size_t row = 0; row < ti.rows; row++)
+	{
+		for (size_t col = 0; col < ti.cols; col++)
+		{
 			MAT_AT(ti, row, col) = (mat_elem_t)images[row * input_cols + col] / 255.f;
 		}
 	}
-	
+
 	to = mat_alloc(labels_num, output_cols);
 	mat_zero(to);
-	for (size_t row = 0; row < ti.rows; row++) {
+	for (size_t row = 0; row < ti.rows; row++)
+	{
 		size_t label = (size_t)labels[row];
 		MAT_AT(to, row, label) = 1.0f;
 	}
-	return (Dataset){ .name = name, .ti = ti, .to = to, .images = images, .labels = labels };
+	return (Dataset){.name = name, .ti = ti, .to = to, .images = images, .labels = labels};
 }
 
 Dataset dataset_mnist_train()
@@ -63,107 +67,117 @@ Dataset dataset_mnist_test()
 //----------------------------------------
 size_t count_correct_predictions(NN nn, Dataset ds, size_t sample_count)
 {
-    if (sample_count <= 0 || sample_count > ds.ti.rows)
-        sample_count = ds.ti.rows;
+	if (sample_count == 0 || sample_count > ds.ti.rows)
+		sample_count = ds.ti.rows;
 
-    size_t correct_predictions = 0;
-    for (size_t i = 0; i < sample_count; i++)
-    {
-        size_t i = rand() % ds.ti.rows;
+	size_t correct_predictions = 0;
+	for (size_t iter = 0; iter < sample_count; iter++)
+	{
+		size_t idx = rand() % ds.ti.rows;
 
-        nn_set_input(&nn, mat_row_view(ds.ti, i));
-        nn_forward(nn);
+		nn_set_input(&nn, mat_row_view(ds.ti, idx));
+		nn_forward(nn);
 
-        size_t predicted = 0;
-        for (size_t j = 1; j < NN_OUTPUT(nn).cols; j++)
-        {
-            if (MAT_AT(NN_OUTPUT(nn), 0, j) > MAT_AT(NN_OUTPUT(nn), 0, predicted))
-            {
-                predicted = j;
-            }
-        }
+		size_t predicted = 0;
+		for (size_t j = 1; j < NN_OUTPUT(nn).cols; j++)
+		{
+			if (MAT_AT(NN_OUTPUT(nn), 0, j) > MAT_AT(NN_OUTPUT(nn), 0, predicted))
+			{
+				predicted = j;
+			}
+		}
 
-        size_t true_label = ds.labels[i];
+		size_t true_label = ds.labels[idx];
 
-        if (predicted == true_label)
-        {
-            correct_predictions++;
-        }
-    }
+		if (predicted == true_label)
+		{
+			correct_predictions++;
+		}
+	}
 
-    return correct_predictions;
+	return correct_predictions;
 }
 
 void print_cost(NN nn, Mat cost_ti, Mat cost_to, size_t epoch, size_t epochs)
 {
-    printf("epoch %zu/%zu, final cost = %f\n", (unsigned long)epoch, epochs, nn_cost(nn, cost_ti, cost_to));
+	printf("epoch %zu/%zu, final cost = %f\n", (unsigned long)epoch, epochs, nn_cost(nn, cost_ti, cost_to));
 }
 
 void print_accuracy(NN nn, Dataset ds_test, size_t sample_count)
 {
-    size_t correct_prediction_count = count_correct_predictions(nn, ds_test, sample_count);
-    float accuracy = (float)correct_prediction_count / sample_count;
-    printf("Accuracy on %s: %.3f (%zu / %zu)\n", ds_test.name, accuracy, correct_prediction_count, sample_count);
+	size_t correct_prediction_count = count_correct_predictions(nn, ds_test, sample_count);
+	float accuracy = (float)correct_prediction_count / sample_count;
+	printf("Accuracy on %s: %.3f (%zu / %zu)\n", ds_test.name, accuracy, correct_prediction_count, sample_count);
 }
 
-void train_network(NN nn, NN g, Dataset ds_train, float rate, size_t batch_size)
-{
-	for (size_t j = 0; j < ds_train.ti.rows; j+= batch_size) {
-		size_t current_batch_size = (j + batch_size > ds_train.ti.rows) ? (ds_train.ti.rows - j) : batch_size;
-		if (current_batch_size == 0)
-			continue;
-		
-		Mat batch_ti = mat_rows_view(ds_train.ti, j, current_batch_size);
-		Mat batch_to = mat_rows_view(ds_train.to, j, current_batch_size);
-		
-		nn_learn(nn, g, batch_ti, batch_to, rate);
-	}
-}
 //----------------------------------------
 // スレッドで実行されるカウンター関数
 static void *counter_thread(void *arg)
 {
-	t_data  *data = (t_data *)arg;
+	t_data *data = (t_data *)arg;
 
-	Dataset dataset = dataset_mnist_load(train_images_path, train_labels_path, "mnist_train");
+	Dataset ds_train = dataset_mnist_load(train_images_path, train_labels_path, "mnist_train");
 	Dataset ds_test = dataset_mnist_load(t10k_images_path, t10k_labels_path, "mnist_test");
-	printf("images: count=%ld,%ld\n", dataset.ti.rows, ds_test.ti.rows);
-	printf("labels: count=%ld,%ld\n", dataset.to.rows, ds_test.to.rows);
-	
+	printf("images: count=%ld,%ld\n", ds_train.ti.rows, ds_test.ti.rows);
+	printf("labels: count=%ld,%ld\n", ds_train.to.rows, ds_test.to.rows);
+
 	pthread_mutex_lock(&data->mutex);
 	data->mnist.counter = 0;
-	for (size_t i = 0; i < 28 * 28; i++) {
-		data->mnist.image_adrs[i] = (unsigned char)(dataset.ti.es[data->mnist.counter * 28 * 28 + i] * 255);
+	for (size_t i = 0; i < 28 * 28; i++)
+	{
+		data->mnist.image_adrs[i] = (unsigned char)(ds_train.ti.es[data->mnist.counter * 28 * 28 + i] * 255);
 	}
 	pthread_mutex_unlock(&data->mutex);
-	
-	size_t arch[] = {dataset.ti.cols, 100, 50, dataset.to.cols};
+
+	size_t arch[] = {ds_train.ti.cols, 100, 50, ds_train.to.cols};
 	NN nn = nn_alloc(arch, ARRAY_LEN(arch));
 	nn_rand(nn, -1, 1);
-	
+
 	float rate = 1e-2;
 	size_t epochs = 25;
 	size_t batch_size = 64;
-	
+
 	size_t sample_count = 1000;
-	Mat cost_ti = mat_rows_view(dataset.ti, 0, sample_count);
-	Mat cost_to = mat_rows_view(dataset.to, 0, sample_count);
+	Mat cost_ti = mat_rows_view(ds_train.ti, 0, sample_count);
+	Mat cost_to = mat_rows_view(ds_train.to, 0, sample_count);
 	print_cost(nn, cost_ti, cost_to, 0, epochs);
 	print_accuracy(nn, ds_test, sample_count);
-		
+
 	NN g = nn_clone_arch(nn);
-	for (size_t i = 0; i < epochs; i++) {
-		train_network(nn, g, dataset, rate, batch_size);
+	for (size_t i = 0; i < epochs; i++)
+	{
+		for (size_t j = 0; j < ds_train.ti.rows; j += batch_size)
+		{
+			size_t current_batch_size = (j + batch_size > ds_train.ti.rows) ? (ds_train.ti.rows - j) : batch_size;
+			if (current_batch_size == 0)
+				continue;
+
+			Mat batch_ti = mat_rows_view(ds_train.ti, j, current_batch_size);
+			Mat batch_to = mat_rows_view(ds_train.to, j, current_batch_size);
+
+			nn_learn(nn, g, batch_ti, batch_to, rate);
+
+			pthread_mutex_lock(&data->mutex);
+			data->mnist.counter++;
+			size_t cur = data->mnist.counter % ds_train.ti.rows;
+			for (size_t i = 0; i < 28 * 28; i++)
+			{
+				data->mnist.image_adrs[i] = (unsigned char)(ds_train.ti.es[cur * 28 * 28 + i] * 256);
+			}
+			pthread_mutex_unlock(&data->mutex);
+		}
 		print_cost(nn, cost_ti, cost_to, i + 1, epochs);
 		print_accuracy(nn, ds_test, sample_count);
 	}
 	nn_free(g);
 
-	while (1) {
+	while (1)
+	{
 		pthread_mutex_lock(&data->mutex);
 		size_t cur = data->mnist.counter;
-		for (size_t i = 0; i < 28 * 28; i++) {
-			data->mnist.image_adrs[i] = (unsigned char)(dataset.ti.es[data->mnist.counter * 28 * 28 + i] * 256);
+		for (size_t i = 0; i < 28 * 28; i++)
+		{
+			data->mnist.image_adrs[i] = (unsigned char)(ds_train.ti.es[data->mnist.counter * 28 * 28 + i] * 256);
 		}
 		pthread_mutex_unlock(&data->mutex);
 		printf("Counter: %ld\n", cur);
@@ -171,7 +185,7 @@ static void *counter_thread(void *arg)
 
 		pthread_mutex_lock(&data->mutex);
 		data->mnist.counter++;
-		if (data->mnist.counter >= dataset.ti.rows)
+		if (data->mnist.counter >= ds_train.ti.rows)
 			data->mnist.counter = 0;
 		pthread_mutex_unlock(&data->mutex);
 	}
@@ -180,7 +194,7 @@ static void *counter_thread(void *arg)
 
 int gate_initialize(t_data *data)
 {
-	pthread_t   thread_id;
+	pthread_t thread_id;
 
 	if (pthread_mutex_init(&data->mutex, NULL) != 0)
 	{
@@ -196,6 +210,6 @@ int gate_initialize(t_data *data)
 	}
 	// スレッドをデタッチし、リソースが自動的に解放されるようにする
 	pthread_detach(thread_id);
-	
+
 	return 0;
 }

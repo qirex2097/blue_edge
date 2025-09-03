@@ -19,8 +19,7 @@ void nn_debug(NN *nn)
  */
 NN nn_alloc(size_t *arch, size_t arch_count)
 {
-    assert(arch_count > 0);
-    assert(arch != NULL);
+    assert(arch && arch_count >= 2 && "architecture must have input and output layer");
 
     NN nn;
     nn.count = arch_count - 1;
@@ -35,9 +34,11 @@ NN nn_alloc(size_t *arch, size_t arch_count)
     nn.deltas = malloc(sizeof(*nn.deltas) * nn.count);
     assert(nn.deltas != NULL);
 
+    assert(arch[0] > 0);
     nn.as[0] = mat_alloc(1, arch[0]);
     for (size_t i = 1; i < arch_count; i++)
     {
+        assert(arch[i] > 0 && "layer must be > 0");
         nn.ws[i - 1] = mat_alloc(nn.as[i - 1].cols, arch[i]);
         nn.bs[i - 1] = mat_alloc(1, arch[i]);
         nn.as[i] = mat_alloc(1, arch[i]);
@@ -50,6 +51,8 @@ NN nn_alloc(size_t *arch, size_t arch_count)
 
 void nn_set_input(NN *nn, Mat m)
 {
+    assert(nn && nn->count > 0);
+    assert(m.cols == nn->ws[0].rows && "input width must match first-layer weight rows");
     MAT_RESIZE(NN_INPUT(*nn), m.rows, m.cols);
     mat_copy_inline(NN_INPUT(*nn), m);
     for (size_t i = 0; i < nn->count; i++)
@@ -58,7 +61,7 @@ void nn_set_input(NN *nn, Mat m)
         MAT_RESIZE(nn->zs[i], m.rows, nn->ws[i].cols);
         MAT_RESIZE(nn->deltas[i], m.rows, nn->ws[i].cols);
     }
-    MAT_RESIZE(NN_OUTPUT(*nn), m.rows, nn->ws[nn->count - 1].cols);
+    // MAT_RESIZE(NN_OUTPUT(*nn), m.rows, nn->ws[nn->count - 1].cols);
 }
 
 NN nn_clone_arch(NN nn)
@@ -159,7 +162,10 @@ float nn_cost(NN nn, Mat ti, Mat to)
         for (size_t j = 0; j < q; j++)
         {
             // 交差エントロピー誤差を計算
-            c += -MAT_AT(y, 0, j) * logf(MAT_AT(NN_OUTPUT(nn), 0, j));
+            // c += -MAT_AT(y, 0, j) * logf(MAT_AT(NN_OUTPUT(nn), 0, j));
+            float p = MAT_AT(NN_OUTPUT(nn), 0, j);
+            if (p < 1e-12f) p = 1e-12f;
+            c += -MAT_AT(y, 0, j) * logf(p);
         }
     }
 
