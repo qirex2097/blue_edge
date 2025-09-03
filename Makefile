@@ -1,5 +1,5 @@
 NAME = app
-SRCS = main.c gate.c win.c mnist.c mat.c
+SRCS = main.c gate.c win.c mnist.c mat.c nn.c
 OBJS = $(SRCS:.c=.o)
 CC = gcc
 MLX_DIR = ./minilibx-linux

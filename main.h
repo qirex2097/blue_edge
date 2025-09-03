@@ -15,9 +15,7 @@ typedef struct {
 
 typedef struct {
 	size_t counter;
-	size_t cols;
-	size_t rows;
-	unsigned char *image_adrs;
+	unsigned char image_adrs[28 * 28];
 } t_mnist;
 
 // mlxポインタをスレッドに渡すための構造体
@@ -25,14 +23,7 @@ typedef struct {
 	void	*mlx_ptr;
 	void	*win_ptr;
 	t_img	img;
-#if 0
-	size_t	counter;
-	size_t	cols;
-	size_t	rows;
-	unsigned char *image_adrs;
-#else
 	t_mnist mnist;
-#endif
 	pthread_mutex_t mutex;
 } t_data;
 

@@ -1,558 +1,264 @@
-#include <math.h>
-#include <time.h>
-#define MAT_IMPLEMENTATION
+#include <string.h>
 #include "mat.h"
-#include "mnist.h"
-#include "nn.h"
 
-//----------------------------------------
-#define MAT_PRINT_MINMAX(m) printf("%s: min=%f,max=%f\n", #m, mat_min(m), mat_max(m))
-int mat_has_nan(Mat m) {
-    for (size_t i = 0; i < m.rows; i++) {
-        for (size_t j = 0; j < m.cols; j++) {
-            if (isnan(MAT_AT(m, i, j))) return 1;
-        }
-    }
-    return 0;
-}
-
-int mat_has_finite(Mat m) {
-    for (size_t i = 0; i < m.rows; i++) {
-        for (size_t j = 0; j < m.cols; j++) {
-            if (!isfinite(MAT_AT(m, i, j))) return 1;
-        }
-    }
-    return 0;
-}
-
-float mat_min(Mat m) {
-    float min_val = MAT_AT(m, 0, 0);
-    for (size_t i = 0; i < m.rows; i++) {
-        for (size_t j = 0; j < m.cols; j++) {
-            if (MAT_AT(m, i, j) < min_val) min_val = MAT_AT(m, i, j);
-        }
-    }
-    return min_val;
-}
-
-float mat_max(Mat m) {
-    float max_val = MAT_AT(m, 0, 0);
-    for (size_t i = 0; i < m.rows; i++) {
-        for (size_t j = 0; j < m.cols; j++) {
-            if (MAT_AT(m, i, j) > max_val) max_val = MAT_AT(m, i, j);
-        }
-    }
-    return max_val;
-}
-//----------------------------------------
-//----------------------------------------
-Affine affine_init(size_t input, size_t output)
+mat_elem_t rand_float(void)
 {
-    Affine layer;
-    float scale = sqrt(2.0f / input);
-    layer.W = mat_alloc(input, output);
-    mat_rand(layer.W, -scale, scale);
-    layer.b = mat_alloc(1, output);
-    mat_zero(layer.b);
-    layer.dW = mat_alloc(input, output);
-    layer.db = mat_alloc(1, output);
-    layer.x = (Mat){0};
-    return layer;
+    return (mat_elem_t)rand() / (mat_elem_t)RAND_MAX;
 }
 
-void affine_free(Affine *layer)
+mat_elem_t sigmoidf(mat_elem_t x)
 {
-    mat_free(&layer->W);
-    mat_free(&layer->b);
-    mat_free(&layer->dW);
-    mat_free(&layer->db);
-    *layer = (Affine){0};
+    return 1.f / (1.f + expf(-x));
 }
 
-Mat affine_forward(Affine *layer, Mat x)
+mat_elem_t dsigmoidf(mat_elem_t x)
 {
-    layer->x = x;
-    Mat y = mat_dot_alloc(x, layer->W);   // y = x*W + b
-    mat_add_rowwise_inplace(y, layer->b); //
-    return y;
+    mat_elem_t s = sigmoidf(x);
+    return s * (1.f - s);
 }
 
-Mat affine_backward(Affine *layer, Mat dy)
+Mat mat_alloc(size_t rows, size_t cols)
 {
-    Mat Wt = mat_transpose_alloc(layer->W);
-    Mat dx = mat_dot_alloc(dy, Wt); // dx = dy * W^T
-    mat_free(&Wt);
-
-    Mat xt = mat_transpose_alloc(layer->x);
-    mat_dot(layer->dW, xt, dy); // dW = x^T * dy
-    mat_free(&xt);
-
-    mat_sum_cols(layer->db, dy); // db = sum(dy)
-
-    return dx;
+    Mat m;
+    m.rows = rows;
+    m.cols = cols;
+    m.es = malloc(sizeof(mat_elem_t) * rows * cols);
+    assert(m.es != NULL);
+    return m;
 }
 
-void affine_update(Affine *layer, float lr)
+Mat mat_resize(Mat m, size_t rows, size_t cols)
 {
-    // W = W - lr * dW
-    for (size_t i = 0; i < layer->W.rows; i++)
+    if (m.rows == rows && m.cols == cols)
+        return m;
+    
+    mat_free(m);
+    return mat_alloc(rows, cols);
+}
+
+Mat mat_free(Mat m)
+{
+    if (!m.es)
+        return (Mat){0};
+    assert(m.es != NULL);
+    free(m.es);
+    return (Mat){0};
+}
+
+void mat_zero(Mat m)
+{
+    assert(m.es);
+    memset(m.es, 0, sizeof(*m.es) * m.rows * m.cols);
+}
+
+void mat_fill(Mat m, mat_elem_t x)
+{
+    for (size_t i = 0; i < m.rows; i++)
     {
-        for (size_t j = 0; j < layer->W.cols; j++)
+        for (size_t j = 0; j < m.cols; j++)
         {
-            layer->W.data[i * layer->W.cols + j] -= lr * layer->dW.data[i * layer->dW.cols + j];
+            MAT_AT(m, i, j) = x;
         }
     }
+}
 
-    // b = b - lr * db
-    for (size_t j = 0; j < layer->b.cols; j++)
+void mat_rand(Mat m, mat_elem_t low, mat_elem_t high)
+{
+    for (size_t i = 0; i < m.rows; i++)
     {
-        layer->b.data[j] -= lr * layer->db.data[j];
+        for (size_t j = 0; j < m.cols; j++)
+        {
+            MAT_AT(m, i, j) = rand_float() * (high - low) + low;
+        }
     }
 }
-//----------------------------------------
-ReLU ReLU_init(size_t row, size_t col)
+
+Mat mat_row_view(Mat m, size_t row)
 {
-    ReLU layer;
-    layer.mask = mat_alloc(row, col);
-    return layer;
+    return mat_rows_view(m, row, 1);
 }
 
-void ReLU_free(ReLU *layer)
+Mat mat_rows_view(Mat m, size_t i, size_t rows)
 {
-    mat_free(&layer->mask);
-    *layer = (ReLU){0};
+    return (Mat){.rows = rows, .cols = m.cols, .es = &MAT_AT(m, i, 0)};
 }
 
-Mat ReLU_forward(ReLU *layer, Mat x)
+void mat_copy_inline(Mat dst, Mat src)
 {
-    Mat y = mat_alloc(x.rows, x.cols);
-    for (size_t row = 0; row < x.rows; row++)
+    assert(dst.rows == src.rows);
+    assert(dst.cols == src.cols);
+    for (size_t i = 0; i < dst.rows; i++)
     {
-        for (size_t col = 0; col < x.cols; col++)
+        for (size_t j = 0; j < dst.cols; j++)
         {
-            mat_elem_t val = MAT_AT(x, row, col);
-            if (val > 0)
+            MAT_AT(dst, i, j) = MAT_AT(src, i, j);
+        }
+    }
+}
+
+void mat_dot_inline(Mat dst, Mat a, Mat b)
+{
+    assert(a.cols == b.rows);
+    assert(dst.rows == a.rows);
+    assert(dst.cols == b.cols);
+    for (size_t i = 0; i < dst.rows; i++)
+    {
+        for (size_t j = 0; j < dst.cols; j++)
+        {
+            MAT_AT(dst, i, j) = 0.f;
+            for (size_t k = 0; k < a.cols; k++)
             {
-                MAT_AT(y, row, col) = val;
-                MAT_AT(layer->mask, row, col) = 1.0f;
+                MAT_AT(dst, i, j) += MAT_AT(a, i, k) * MAT_AT(b, k, j);
             }
-            else
+        }
+    }
+}
+
+Mat mat_dot(Mat a, Mat b)
+{
+    Mat m = mat_alloc(a.rows, b.cols);
+    mat_dot_inline(m, a, b);
+    return m;
+}
+
+Mat mat_transpose(Mat a)
+{
+    Mat m = mat_alloc(a.cols, a.rows);
+    for (size_t i = 0; i < a.rows; i++)
+    {
+        for (size_t j = 0; j < a.cols; j++)
+        {
+            MAT_AT(m, j, i) = MAT_AT(a, i, j);
+        }
+    }
+    return m;
+}
+
+// C = A^T * B
+// A: (rowsA x colsA)
+// B: (rowsB x colsB)
+// C: (colsA x colsB)
+void mat_dot_transposeA_inline(Mat C, Mat A, Mat B)
+{
+    assert(A.rows == B.rows);
+    assert(C.rows == A.cols);
+    assert(C.cols == B.cols);
+
+    size_t m = A.cols; // A^Tの行数
+    size_t n = B.cols; // Bの列数
+    size_t k = A.rows; // A^Tの列数 = Bの行数
+
+    for (size_t i = 0; i < m; i++)
+    {
+        for (size_t j = 0; j < n; j++)
+        {
+            float sum = 0.f;
+            for (size_t t = 0; t < k; t++)
             {
-                MAT_AT(y, row, col) = 0;
-                MAT_AT(layer->mask, row, col) = 0.0f;
+                sum += MAT_AT(A, t, i) * MAT_AT(B, t, j);
             }
+            MAT_AT(C, i, j) = sum;
         }
     }
-    return y;
 }
 
-Mat ReLU_backward(ReLU *layer, Mat dy)
+void mat_sum_inline(Mat dst, Mat a)
 {
-    Mat dx = mat_alloc(dy.rows, dy.cols);
-    for (size_t row = 0; row < dx.rows; row++)
+    assert(dst.rows == a.rows);
+    assert(dst.cols == a.cols);
+    for (size_t i = 0; i < dst.rows; i++)
     {
-        for (size_t col = 0; col < dx.cols; col++)
+        for (size_t j = 0; j < dst.cols; j++)
         {
-            if (MAT_AT(layer->mask, row, col))
-                MAT_AT(dx, row, col) = MAT_AT(dy, row, col);
-            else
-                MAT_AT(dx, row, col) = 0;
+            MAT_AT(dst, i, j) += MAT_AT(a, i, j);
         }
     }
-    return dx;
-}
-//----------------------------------------
-typedef struct {
-    Mat sigmoid;
-} Sigmoid;
-
-Sigmoid Sigmoid_init(size_t row, size_t col)
-{
-    Sigmoid layer;
-    layer.sigmoid = mat_alloc(row, col);
-    return layer;
 }
 
-Mat Sigmoid_forward(Sigmoid *layer, Mat x)
+void mat_sum_bias_inline(Mat dst, Mat bias)
 {
-    Mat y = mat_alloc(x.rows, x.cols);
-    for (size_t row = 0; row < x.rows; row++)
+    assert(bias.rows == 1);
+    assert(dst.cols == bias.cols);
+
+    for (size_t i = 0; i < dst.rows; i++)
     {
-        for (size_t col = 0; col < x.cols; col++)
+        for (size_t j = 0; j < dst.cols; j++)
         {
-            mat_elem_t val = MAT_AT(x, row, col);
-            MAT_AT(y, row, col) = 1.0 / (1.0 + exp(-val));
+            MAT_AT(dst, i, j) += MAT_AT(bias, 0, j);
         }
     }
-    mat_copy(layer->sigmoid, y);
-    return y;
 }
 
-Mat Sigmoid_backward(Sigmoid *layer, Mat dy)
+void mat_scalar_div_inline(Mat dst, float scalar)
 {
-    Mat dx = mat_alloc(dy.rows, dy.cols);
-    for (size_t row = 0; row < dx.rows; row++)
+    assert(scalar != 0.f); // 0で割らないように注意
+    for (size_t i = 0; i < dst.rows; i++)
     {
-        for (size_t col = 0; col < dx.cols; col++)
+        for (size_t j = 0; j < dst.cols; j++)
         {
-            mat_elem_t s = MAT_AT(layer->sigmoid, row, col);
-            MAT_AT(dx, row, col) = MAT_AT(dy, row, col) * s * (1.0 - s);
+            MAT_AT(dst, i, j) /= scalar;
         }
     }
-    return dx;
 }
-//----------------------------------------
-Mat softmax(Mat src)
+
+void mat_sig(Mat m)
 {
-    Mat dst = mat_alloc(src.rows, src.cols);
-    for (size_t row = 0; row < src.rows; row++)
+    for (size_t i = 0; i < m.rows; i++)
     {
-        mat_elem_t max_val = MAT_AT(src, row, 0);
-        for (size_t col = 1; col < src.cols; col++)
+        for (size_t j = 0; j < m.cols; j++)
         {
-            if (MAT_AT(src, row, col) > max_val)
-                max_val = MAT_AT(src, row, col);
-        }
-
-        mat_elem_t sum_exp = 0;
-        for (size_t col = 0; col < src.cols; col++)
-        {
-            mat_elem_t e = exp(MAT_AT(src, row, col) - max_val);
-            MAT_AT(dst, row, col) = e;
-            sum_exp += e;
-        }
-
-        for (size_t col = 0; col < src.cols; col++)
-        {
-            MAT_AT(dst, row, col) /= sum_exp;
-
-            if (isnan(MAT_AT(dst, row, col)) || !isfinite(MAT_AT(dst, row, col))) {
-                MAT_PRINT_MINMAX(dst);
-                // assert(!isnan(MAT_AT(dst, row, col)));
-                // assert(isfinite(MAT_AT(dst, row, col)));
-                // assert(MAT_AT(dst,row,col) >= 0.0f);
-                exit(1);
-            }
+            MAT_AT(m, i, j) = sigmoidf(MAT_AT(m, i, j));
         }
     }
-    return dst;
 }
 
-Mat softmax_cross_entropy_backward(Mat y, Mat t)
+void mat_dsig(Mat dst, Mat src)
 {
-    Mat dx = mat_alloc(y.rows, y.cols);
-    for (size_t row = 0; row < y.rows; row++)
+    assert(dst.rows == src.rows);
+    assert(dst.cols == src.cols);
+    for (size_t i = 0; i < dst.rows; i++)
     {
-        for (size_t col = 0; col < y.cols; col++)
+        for (size_t j = 0; j < dst.cols; j++)
         {
-            MAT_AT(dx, row, col) = (MAT_AT(y, row, col) - MAT_AT(t, row, col)) / y.rows;
+            MAT_AT(dst, i, j) = dsigmoidf(MAT_AT(src, i, j));
         }
     }
-    return dx;
 }
 
-mat_elem_t cross_entropy(Mat y, Mat t)
+void mat_softmax(Mat m)
 {
-    mat_elem_t loss = 0;
-    mat_elem_t eps = 1e-12;
-    for (size_t row = 0; row < y.rows; row++)
+    for (size_t i = 0; i < m.rows; i++)
     {
-        for (size_t col = 0; col < y.cols; col++)
+        float max = MAT_AT(m, 0, 0);
+        for (size_t j = 1; j < m.cols; j++)
         {
-            if (MAT_AT(t, row, col) == 1.0)
-            {
-                mat_elem_t p = MAT_AT(y, row, col);
-                loss -= log(p + eps);
-            }
+            if (MAT_AT(m, i, j) > max)
+                max = MAT_AT(m, i, j);
+        }
+        float sum = 0.f;
+        for (size_t j = 0; j < m.cols; j++)
+        {
+            MAT_AT(m, i, j) = expf(MAT_AT(m, i, j) - max);
+            sum += MAT_AT(m, i, j);
+        }
+        for (size_t j = 0; j < m.cols; j++)
+        {
+            MAT_AT(m, i, j) /= sum;
         }
     }
-    return loss / y.rows;
-}
-//----------------------------------------
-NN NN_init(size_t input_size, size_t hidden1_size, size_t hidden2_size, size_t output_size, size_t batch_size)
-{
-    NN nn;
-    nn.l1 = affine_init(input_size, hidden1_size);
-    nn.r1 = ReLU_init(batch_size, hidden1_size);
-    nn.l2 = affine_init(hidden1_size, hidden2_size);
-    nn.r2 = ReLU_init(batch_size, hidden2_size);
-    nn.l3 = affine_init(hidden2_size, output_size);
-    return nn;
 }
 
-void NN_free(NN *nn)
+void mat_print(Mat m, const char *name, size_t padding)
 {
-    affine_free(&nn->l1);
-    ReLU_free(&nn->r1);
-    affine_free(&nn->l2);
-    ReLU_free(&nn->r2);
-    affine_free(&nn->l3);
-}
-
-Mat NN_forward(NN *nn, Mat x_batch)
-{
-    Mat a1 = affine_forward(&nn->l1, x_batch);
-    Mat z1 = ReLU_forward(&nn->r1, a1);
-
-    Mat a2 = affine_forward(&nn->l2, z1);
-    Mat z2 = ReLU_forward(&nn->r2, a2);
-
-    Mat a3 = affine_forward(&nn->l3, z2);
-    Mat y = softmax(a3);
-
-    mat_free(&a1);
-    mat_free(&z1);
-    mat_free(&a2);
-    mat_free(&z2);
-    mat_free(&a3);
-
-    return y;
-}
-
-void NN_backward(NN *nn, Mat y, Mat t_batch)
-{
-    Mat dy = softmax_cross_entropy_backward(y, t_batch);
-    Mat dz2 = affine_backward(&nn->l3, dy);
-    Mat da2 = ReLU_backward(&nn->r2, dz2);
-
-    Mat dz1 = affine_backward(&nn->l2, da2);
-    Mat da1 = ReLU_backward(&nn->r1, dz1);
-
-    affine_backward(&nn->l1, da1);
-
-    mat_free(&dy);
-    mat_free(&dz2);
-    mat_free(&da2);
-    mat_free(&dz1);
-    mat_free(&da1);
-}
-
-void NN_update(NN *nn, float learning_rate)
-{
-    affine_update(&nn->l1, learning_rate);
-    affine_update(&nn->l2, learning_rate);
-    affine_update(&nn->l3, learning_rate);
-}
-//----------------------------------------
-Mat read_images(const char *filename)
-{
-    t_mnist_data mnist_data = mnist_read_images(filename);
-    assert(mnist_data.adrs != NULL);
-    printf("%s readed. image num = %zu\n", filename, mnist_data.count);
-
-    size_t images_num = mnist_data.count;
-    size_t input_cols = 28 * 28;
-    Mat ti = mat_alloc(images_num, input_cols);
-    for (size_t row = 0; row < images_num; row++)
+    printf("%*s%s = [\n", (int)padding, "", name);
+    for (size_t i = 0; i < m.rows; i++)
     {
-        for (size_t col = 0; col < input_cols; col++)
+        printf("%*s    ", (int)padding, "");
+        for (size_t j = 0; j < m.cols; j++)
         {
-            MAT_AT(ti, row, col) = (mat_elem_t)mnist_data.adrs[row * input_cols + col] / 255.f;
-        }
-    }
-    free(mnist_data.adrs);
-    return ti;
-}
-
-Mat read_labels(const char *filename)
-{
-    t_mnist_data mnist_data = mnist_read_labels(filename);
-    assert(mnist_data.adrs != NULL);
-    printf("%s readed. label num = %zu\n", filename, mnist_data.count);
-
-    size_t labels_num = mnist_data.count;
-    size_t output_cols = 10;
-    Mat to = mat_alloc(labels_num, output_cols);
-    mat_zero(to);
-    for (size_t row = 0; row < labels_num; row++)
-    {
-        MAT_AT(to, row, mnist_data.adrs[row]) = 1;
-    }
-    free(mnist_data.adrs);
-    return to;
-}
-
-// 指定されたインデックスの画像とラベルを表示する
-void print_image(Mat ti, Mat to, size_t index)
-{
-    mat_elem_t *images = &MAT_AT(ti, index, 0);
-    size_t label = 0;
-    for (size_t col = 0; col < to.cols; col++)
-    {
-        if (MAT_AT(to, index, col) == 1.0f)
-            label = col;
-    }
-    for (int i = 0; i < 28; i++)
-    {
-        for (int j = 0; j < 28; j++)
-        {
-            mat_elem_t pixel = images[i * 28 + j];
-            printf("%c", pixel > 0.5f ? '#' : '.');
+            printf("%f ", MAT_AT(m, i, j));
         }
         printf("\n");
     }
-    printf("Image #%zu, Label: %zu\n", index, label);
+    printf("%*s]\n", (int)padding, "");
 }
-//----------------------------------------
-// 正解率を計算する関数
-float calculate_accuracy(Mat predictions, Mat targets)
-{
-    size_t correct = 0;
-
-    for (size_t row = 0; row < predictions.rows; row++)
-    {
-        // 予測：最大値のインデックスを見つける
-        size_t pred_class = 0;
-        mat_elem_t max_pred = MAT_AT(predictions, row, 0);
-        for (size_t col = 1; col < predictions.cols; col++)
-        {
-            if (MAT_AT(predictions, row, col) > max_pred)
-            {
-                max_pred = MAT_AT(predictions, row, col);
-                pred_class = col;
-            }
-        }
-
-        // 正解：1が立っているインデックスを見つける
-        size_t true_class = 0;
-        for (size_t col = 0; col < targets.cols; col++)
-        {
-            if (MAT_AT(targets, row, col) == 1.0f)
-            {
-                true_class = col;
-                break;
-            }
-        }
-
-        if (pred_class == true_class)
-        {
-            correct++;
-        }
-    }
-
-    return (float)correct / predictions.rows;
-}
-
-// より効率的な版（テスト用データセット全体の正解率）
-float evaluate_accuracy(Mat test_x, Mat test_t, Affine *l1, ReLU *r1, Affine *l2, ReLU *r2, Affine *l3)
-{
-    size_t batch_size = 100; // 評価用のバッチサイズ
-    size_t total_correct = 0;
-    size_t total_samples = 0;
-
-    for (size_t i = 0; i < test_x.rows; i += batch_size)
-    {
-        size_t current_batch_size = (i + batch_size > test_x.rows) ? (test_x.rows - i) : batch_size;
-
-        Mat x_batch = mat_slice_view(test_x, i, current_batch_size);
-        Mat t_batch = mat_slice_view(test_t, i, current_batch_size);
-
-        // Forward pass
-        Mat a1 = affine_forward(l1, x_batch);
-        Mat z1 = ReLU_forward(r1, a1);
-        Mat a2 = affine_forward(l2, z1);
-        Mat z2 = ReLU_forward(r2, a2);
-        Mat a3 = affine_forward(l3, z2);
-        Mat y = softmax(a3);
-
-        // 正解数をカウント
-        for (size_t row = 0; row < current_batch_size; row++)
-        {
-            size_t pred_class = 0;
-            mat_elem_t max_pred = MAT_AT(y, row, 0);
-            for (size_t col = 1; col < y.cols; col++)
-            {
-                if (MAT_AT(y, row, col) > max_pred)
-                {
-                    max_pred = MAT_AT(y, row, col);
-                    pred_class = col;
-                }
-            }
-
-            size_t true_class = 0;
-            for (size_t col = 0; col < t_batch.cols; col++)
-            {
-                if (MAT_AT(t_batch, row, col) == 1.0f)
-                {
-                    true_class = col;
-                    break;
-                }
-            }
-
-            if (pred_class == true_class)
-            {
-                total_correct++;
-            }
-        }
-
-        total_samples += current_batch_size;
-
-        // メモリ解放
-        mat_free(&a1);
-        mat_free(&z1);
-        mat_free(&a2);
-        mat_free(&z2);
-        mat_free(&a3);
-        mat_free(&y);
-    }
-
-    return (float)total_correct / total_samples;
-}
-
-#ifdef MAT_STANDALONE
-int main(void)
-{
-    time_t tt = 1756511352;
-    // time_t tt = time(0);
-    // printf("tt=%zu\n", tt);
-    srand(tt);
-    // MNIST読み込み
-    Mat train_x = read_images("data/train-images-idx3-ubyte");
-    Mat train_t = read_labels("data/train-labels-idx1-ubyte");
-
-    size_t input_size = 784;
-    size_t hidden1_size = 128;
-    size_t hidden2_size = 64;
-    size_t output_size = 10;
-    size_t batch_size = 100;
-    size_t epochs = 10;
-    float learning_rate = 0.005f / batch_size;
-
-    // パラメータ初期化
-    NN nn = NN_init(input_size, hidden1_size, hidden2_size, output_size, batch_size);
-
-    for (size_t epoch = 0; epoch < epochs; epoch++)
-    {
-        for (size_t i = 0; i < train_x.rows; i += batch_size)
-        {
-            // ミニバッチ作成
-            Mat x_batch = mat_slice_view(train_x, i, batch_size);
-            Mat t_batch = mat_slice_view(train_t, i, batch_size);
-
-            // --- forward ---
-            Mat y = NN_forward(&nn, x_batch);
-            mat_elem_t loss = cross_entropy(y, t_batch);
-
-            // --- backward ---
-            NN_backward(&nn, y, t_batch);
-            // --- 更新 ---
-            NN_update(&nn, learning_rate);
-
-            if (i % 1000 == 0)
-            {
-                float batch_accuracy = calculate_accuracy(y, t_batch);
-                printf("epoch %zu, iter %zu, loss = %f, batch_acc = %f\n", epoch, i, loss, batch_accuracy);
-            }
-
-            // メモリ解放
-            mat_free(&y);
-            // x_batch and t_batch are views, do not free them.
-        }
-    }
-
-    NN_free(&nn);
-    mat_free(&train_x);
-    mat_free(&train_t);
-    return 0;
-}
-#endif

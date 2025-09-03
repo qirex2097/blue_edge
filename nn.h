@@ -1,40 +1,41 @@
-#ifndef NN_H_
-#define NN_H_
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <math.h>
 #include "mat.h"
 
-typedef struct
-{
-    Mat W, b;
-    Mat x;
-    Mat dW, db;
-} Affine;
+#ifndef _NN_H_
+#define _NN_H_
 
 typedef struct
 {
-    Mat mask;
-} ReLU;
-
-typedef struct
-{
-    // パラメータ初期化
-    Affine l1;
-    ReLU r1;
-    Affine l2;
-    ReLU r2;
-    Affine l3;
+    size_t count;
+    Mat *ws;
+    Mat *bs;
+    Mat *as;
+    // 誤差逆伝播法用のメンバー
+    Mat *zs;
+    Mat *deltas;
 } NN;
 
-NN NN_init(size_t input_size, size_t hidden1_size, size_t hidden2_size, size_t output_size, size_t batch_size);
-void NN_free(NN *nn);
-Mat NN_forward(NN *nn, Mat x_batch);
-void NN_backward(NN *nn, Mat y, Mat t_batch);
-void NN_update(NN *nn, float learning_rate);
+#define NN_INPUT(nn) (nn).as[0]
+#define NN_OUTPUT(nn) (nn).as[(nn).count]
 
-mat_elem_t cross_entropy(Mat y, Mat t);
+#define ARRAY_LEN(xs) (sizeof(xs) / sizeof((xs)[0]))
 
-Mat read_images(const char *filename);
-Mat read_labels(const char *filename);
-void print_image(Mat ti, Mat to, size_t index);
-float calculate_accuracy(Mat predictions, Mat targets);
+NN nn_alloc(size_t *arch, size_t arch_count);
+void nn_set_input(NN *nn, Mat m);
+NN nn_clone_arch(NN nn);
+void nn_print(NN nn, const char *name);
+void nn_rand(NN nn, float low, float high);
+void nn_forward(NN nn);
+float nn_cost(NN nn, Mat ti, Mat to);
+void nn_finite_diff(NN nn, NN g, float eps, Mat ti, Mat to);
+void nn_backprop(NN nn, NN g, Mat ti, Mat to);
+void nn_backprop_batch(NN nn, NN g, Mat ti, Mat to);
+void nn_learn(NN nn, NN g, Mat ti, Mat to, float rate);
+void nn_free(NN nn);
+#define NN_PRINT(nn) nn_print(nn, #nn)
 
-#endif//NN_H_
+#endif //_NN_H_
