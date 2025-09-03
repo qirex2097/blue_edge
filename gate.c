@@ -55,6 +55,16 @@ Dataset dataset_mnist_load(const char *image_path, const char *label_path, const
 	return (Dataset){.name = name, .ti = ti, .to = to, .images = images, .labels = labels};
 }
 
+void dataset_free(Dataset *ds)
+{
+	if (!ds) return;
+	MAT_FREE(ds->to);
+	MAT_FREE(ds->ti);
+	free(ds->images);
+	free(ds->labels);
+	*ds = (Dataset){0};
+}
+
 Dataset dataset_mnist_train()
 {
 	return dataset_mnist_load(train_images_path, train_labels_path, "mnist_train");
@@ -98,16 +108,19 @@ size_t count_correct_predictions(NN nn, Dataset ds, size_t sample_count)
 	return correct_predictions;
 }
 
-void print_cost(NN nn, Mat cost_ti, Mat cost_to, size_t epoch, size_t epochs)
+float print_cost(NN nn, Mat cost_ti, Mat cost_to, size_t epoch, size_t epochs)
 {
-	printf("epoch %zu/%zu, final cost = %f\n", (unsigned long)epoch, epochs, nn_cost(nn, cost_ti, cost_to));
+	float cost = nn_cost(nn, cost_ti, cost_to);
+	printf("epoch %zu/%zu, final cost = %f\n", (unsigned long)epoch, epochs, cost);
+	return cost;
 }
 
-void print_accuracy(NN nn, Dataset ds_test, size_t sample_count)
+float print_accuracy(NN nn, Dataset ds_test, size_t sample_count)
 {
 	size_t correct_prediction_count = count_correct_predictions(nn, ds_test, sample_count);
 	float accuracy = (float)correct_prediction_count / sample_count;
 	printf("Accuracy on %s: %.3f (%zu / %zu)\n", ds_test.name, accuracy, correct_prediction_count, sample_count);
+	return accuracy;
 }
 
 //----------------------------------------
@@ -140,11 +153,16 @@ static void *counter_thread(void *arg)
 	size_t sample_count = 1000;
 	Mat cost_ti = mat_rows_view(ds_train.ti, 0, sample_count);
 	Mat cost_to = mat_rows_view(ds_train.to, 0, sample_count);
-	print_cost(nn, cost_ti, cost_to, 0, epochs);
-	print_accuracy(nn, ds_test, sample_count);
+	float cost = print_cost(nn, cost_ti, cost_to, 0, epochs);
+	float accuracy = print_accuracy(nn, ds_test, sample_count);
+
+	pthread_mutex_lock(&data->mutex);
+	data->mnist.cost = cost;
+	data->mnist.accuracy = accuracy;
+	pthread_mutex_unlock(&data->mutex);
 
 	NN g = nn_clone_arch(nn);
-	for (size_t i = 0; i < epochs; i++)
+	for (size_t iter = 0; iter < epochs; iter++)
 	{
 		for (size_t j = 0; j < ds_train.ti.rows; j += batch_size)
 		{
@@ -160,17 +178,25 @@ static void *counter_thread(void *arg)
 			pthread_mutex_lock(&data->mutex);
 			data->mnist.counter++;
 			size_t cur = data->mnist.counter % ds_train.ti.rows;
-			for (size_t i = 0; i < 28 * 28; i++)
+			for (size_t pos = 0; pos < 28 * 28; pos++)
 			{
-				data->mnist.image_adrs[i] = (unsigned char)(ds_train.ti.es[cur * 28 * 28 + i] * 256);
+				data->mnist.image_adrs[pos] = (unsigned char)(ds_train.ti.es[cur * 28 * 28 + pos] * 255);
 			}
 			pthread_mutex_unlock(&data->mutex);
 		}
-		print_cost(nn, cost_ti, cost_to, i + 1, epochs);
-		print_accuracy(nn, ds_test, sample_count);
+		cost = print_cost(nn, cost_ti, cost_to, iter + 1, epochs);
+		accuracy = print_accuracy(nn, ds_test, sample_count);
+		pthread_mutex_lock(&data->mutex);
+		data->mnist.epoch = iter + 1;
+		data->mnist.cost = cost;
+		data->mnist.accuracy = accuracy;
+		pthread_mutex_unlock(&data->mutex);
 	}
 	nn_free(g);
 
+	dataset_free(&ds_train);
+	dataset_free(&ds_test);
+	
 	while (1)
 	{
 		pthread_mutex_lock(&data->mutex);

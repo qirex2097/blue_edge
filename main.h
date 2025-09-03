@@ -16,6 +16,9 @@ typedef struct {
 typedef struct {
 	size_t counter;
 	unsigned char image_adrs[28 * 28];
+	size_t epoch;
+	float cost;
+	float accuracy;
 } t_mnist;
 
 // mlxポインタをスレッドに渡すための構造体

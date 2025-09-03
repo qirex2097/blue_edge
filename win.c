@@ -95,7 +95,14 @@ int render_next_frame(void* arg)
 		}
 	}
 
-	debug_print(data, "COUNTER");
+	pthread_mutex_lock(&data->mutex);
+	size_t counter = data->mnist.counter;
+	size_t epoch = data->mnist.epoch;
+	float cost = data->mnist.cost;
+	float accuracy = data->mnist.accuracy;
+	pthread_mutex_unlock(&data->mutex);
+
+	debug_print(data, "epoch=%zu, counter=%6zu, cost=%f, accuracy=%f", epoch, counter, cost, accuracy);
 
 	return 0;
 }
