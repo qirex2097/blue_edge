@@ -80,24 +80,29 @@ int render_next_frame(void* arg)
 	my_img_clear(&data->img);
 	// デバッグプリントをリセット
 	debug_reset_lines();
+	
+	if (!(data->mnist.image_adrs)) return 0;
 
+	unsigned char image_adrs[28 * 28];
 	pthread_mutex_lock(&data->mutex);
-	int counter = data->mnist.counter;
-	unsigned char *image_adrs = &data->mnist.image_adrs[counter * data->mnist.cols * data->mnist.rows];
+	memcpy(image_adrs, data->mnist.image_adrs, sizeof(image_adrs));
 	pthread_mutex_unlock(&data->mutex);
-	if (image_adrs) {
-		int rows = data->mnist.rows;
-		int cols = data->mnist.cols;
-		for (int i = 0; i < rows; i++) {
-			for (int j = 0; j < cols; j++) {
-				unsigned char pixel = image_adrs[i * rows + j];
-				int gray = (int)pixel * 0x010101;
-				my_img_pixel_put(&data->img, j + 100, i + 100, gray);
-			}
+	for (int i = 0; i < 28; i++) {
+		for (int j = 0; j < 28; j++) {
+			unsigned char pixel = image_adrs[i * 28 + j];
+			int gray = (int)pixel * 0x010101;
+			my_img_pixel_put(&data->img, j + 100, i + 100, gray);
 		}
 	}
 
-	debug_print(data, "COUNTER");
+	pthread_mutex_lock(&data->mutex);
+	size_t counter = data->mnist.counter;
+	size_t epoch = data->mnist.epoch;
+	float cost = data->mnist.cost;
+	float accuracy = data->mnist.accuracy;
+	pthread_mutex_unlock(&data->mutex);
+
+	debug_print(data, "epoch=%zu, counter=%6zu, cost=%f, accuracy=%f", epoch, counter, cost, accuracy);
 
 	return 0;
 }

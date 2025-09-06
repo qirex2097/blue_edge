@@ -1,6 +1,8 @@
 .env
-minilibx-linux
-data
+minilibx-linux/*
+data/*
 a.out
 app
+mat
+mnist
 *.o

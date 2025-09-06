@@ -8,11 +8,13 @@
 #define MNIST_IMAGE_COLS 28
 
 // 画像データを読み込む
-t_mnist_data mnist_read_images(const char* filename) {
+unsigned char* mnist_read_images(const char* filename, int* count) {
+    assert(count);
+    assert(filename);
     FILE* fp = fopen(filename, "rb");
     if (!fp) {
         perror("fopen");
-        return (t_mnist_data){0};
+        return NULL;
     }
     uint32_t magic, num, rows, cols;
     fread(&magic, 4, 1, fp);
@@ -26,31 +28,43 @@ t_mnist_data mnist_read_images(const char* filename) {
     cols  = __builtin_bswap32(cols);
 
     if (magic != 2051) {
-        printf("MNIST image file\n");
+        fprintf(stderr, "Not MNIST image file\n");
         fclose(fp);
-        return (t_mnist_data){0};
+        return NULL;
     }
-
-    t_mnist_data data = { .adrs = NULL, .count = num, .cols = cols, .rows = rows, };
-    size_t total = (size_t)num * (size_t)rows * (size_t)cols;
-    data.adrs = malloc(total);
-    if (!data.adrs) {
+    if (rows != MNIST_IMAGE_ROWS || cols != MNIST_IMAGE_COLS) {
+        fprintf(stderr, "Unexpected image dims: %u x %u\n", rows, cols);
+        fclose(fp);
+        return NULL;
+    }
+    *count = num;
+    size_t total = (size_t)num * rows * cols;
+    unsigned char* data = malloc(total);
+    if (!data) {
         perror("malloc");
         fclose(fp);
-        return (t_mnist_data){0};
+        return NULL;
     }
-    size_t nread = fread(data.adrs, 1, num * rows * cols, fp);
-    assert(nread == total);
+    size_t read_size;
+    read_size = fread(data, 1, total, fp);
+    if (read_size != total) {
+        perror("short read on data\n");
+        free(data);
+        fclose(fp);
+        return NULL;
+    }
     fclose(fp);
     return data;
 }
 
 // ラベルデータを読み込む
-t_mnist_data mnist_read_labels(const char* filename) {
+unsigned char* mnist_read_labels(const char* filename, int* count) {
+    assert(filename);
+    assert(count);
     FILE* fp = fopen(filename, "rb");
     if (!fp) {
         perror("fopen");
-        return (t_mnist_data){0};
+        return NULL;
     }
     uint32_t magic, num;
     fread(&magic, 4, 1, fp);
@@ -58,16 +72,27 @@ t_mnist_data mnist_read_labels(const char* filename) {
     magic = __builtin_bswap32(magic);
     num   = __builtin_bswap32(num);
     if (magic != 2049) {
-        printf("Not MNIST label file\n");
+        fprintf(stderr, "Not MNIST label file\n");
         fclose(fp);
-        return (t_mnist_data){0};
+        return NULL;
     }
-
-    t_mnist_data data = { .adrs = NULL, .count = num, .cols = 0, .rows = 0, };
-    data.adrs = malloc(num);
-    fread(data.adrs, 1, num, fp);
+    *count = num;
+    unsigned char* labels = malloc(num);
+    if (!labels) {
+        perror("malloc");
+        fclose(fp);
+        return NULL;
+    }
+    size_t read_size;
+    read_size = fread(labels, 1, num, fp);
+    if (read_size != num) {
+        perror("short read on labels\n");
+        free(labels);
+        fclose(fp);
+        return NULL;
+    }
     fclose(fp);
-    return data;
+    return labels;
 }
 
 // 指定されたインデックスの画像とラベルを表示する
@@ -87,18 +112,18 @@ void mnist_print_image(unsigned char* images, unsigned char* labels, int index) 
 #ifdef MNIST_STANDALONE
 int main(void)
 {
-    t_mnist_data images_data, labels_data;
-    images_data = mnist_read_images("data/train-images-idx3-ubyte");
-    labels_data = mnist_read_labels("data/train-labels-idx1-ubyte");
+    int num_images, num_labels;
+    unsigned char* images = mnist_read_images("data/train-images-idx3-ubyte", &num_images);
+    unsigned char* labels = mnist_read_labels("data/train-labels-idx1-ubyte", &num_labels);
 
-    if (images_data.adrs && labels_data.adrs) {
-        printf("Loaded %zu images, %zu labels\n", images_data.count, labels_data.count);
+    if (images && labels) {
+        printf("Loaded %d images, %d labels\n", num_images, num_labels);
         // 例: 1枚目の画像を表示
-        mnist_print_image(images_data.adrs, labels_data.adrs, 0);
+        mnist_print_image(images, labels, 0);
     }
 
-    free(images_data.adrs);
-    free(labels_data.adrs);
+    free(images);
+    free(labels);
     return 0;
 }
 #endif // MNIST_STANDALONE
