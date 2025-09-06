@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
+#include <assert.h>
 #include "main.h"
 #include "gate.h"
 #include "mnist.h"
@@ -117,6 +118,7 @@ float print_cost(NN nn, Mat cost_ti, Mat cost_to, size_t epoch, size_t epochs)
 
 float print_accuracy(NN nn, Dataset ds_test, size_t sample_count)
 {
+	if (sample_count == 0 || sample_count > ds_test.ti.rows) sample_count = ds_test.ti.rows;
 	size_t correct_prediction_count = count_correct_predictions(nn, ds_test, sample_count);
 	float accuracy = (float)correct_prediction_count / sample_count;
 	printf("Accuracy on %s: %.3f (%zu / %zu)\n", ds_test.name, accuracy, correct_prediction_count, sample_count);
@@ -131,8 +133,8 @@ static void *counter_thread(void *arg)
 
 	Dataset ds_train = dataset_mnist_load(train_images_path, train_labels_path, "mnist_train");
 	Dataset ds_test = dataset_mnist_load(t10k_images_path, t10k_labels_path, "mnist_test");
-	printf("images: count=%ld,%ld\n", ds_train.ti.rows, ds_test.ti.rows);
-	printf("labels: count=%ld,%ld\n", ds_train.to.rows, ds_test.to.rows);
+	printf("images: count=%zu,%zu\n", ds_train.ti.rows, ds_test.ti.rows);
+	printf("labels: count=%zu,%zu\n", ds_train.to.rows, ds_test.to.rows);
 
 	pthread_mutex_lock(&data->mutex);
 	data->mnist.counter = 0;
@@ -206,7 +208,7 @@ static void *counter_thread(void *arg)
 			data->mnist.image_adrs[i] = (unsigned char)(ds_train.ti.es[data->mnist.counter * 28 * 28 + i] * 256);
 		}
 		pthread_mutex_unlock(&data->mutex);
-		printf("Counter: %ld\n", cur);
+		printf("Counter: %zu\n", cur);
 		sleep(1); // 1秒待機
 
 		pthread_mutex_lock(&data->mutex);
